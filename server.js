@@ -1,19 +1,22 @@
-// server.js
-const express = require('express');
-const path = require('path');
+// server.js (Use 'import' statements)
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Define __dirname equivalent for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-// Use the port provided by the hosting environment (Render) or default to 10000
 const PORT = process.env.PORT || 10000; 
 
-// The built frontend files are located in the 'dist' folder
-const staticPath = path.join(__dirname, 'dist');
+// The built frontend files are in the 'dist' folder.
+const staticPath = path.join(__dirname, 'dist'); 
 
 // Serve all static files from the 'dist' directory
 app.use(express.static(staticPath));
 
 // For all other GET requests, serve the index.html file.
-// This is crucial for client-side routing (deep links)
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
