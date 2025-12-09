@@ -1,8 +1,8 @@
 // server.js (UPDATED TO INCLUDE API PROXY ROUTES)
 
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const express = require('express');
+const path = require('path');
+const { fileURLToPath } = require('url')
 
 // --- IMPORT SECURE GEMINI FUNCTIONS ---
 // Note: Ensure this path is correct relative to your server.js file.
