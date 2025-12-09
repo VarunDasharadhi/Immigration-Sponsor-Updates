@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
+    "start": "node server.js"
   },
   "dependencies": {
     "react": "^19.2.1",
     "@google/genai": "^1.32.0",
     "react-dom": "^19.2.1",
+    "express": "^4.19.2",
     "lucide-react": "^0.556.0",
     "recharts": "^3.5.1"
   },
