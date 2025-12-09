@@ -13,7 +13,8 @@ const root = path.resolve(currentDir, '..'); // Let's simplify this:
 
 // *** USE THIS LINE FOR THE STATIC PATH ***
 // This reliably points to the 'dist' folder at the root of the project
-const staticPath = path.join(currentDir, 'dist'); 
+//const staticPath = path.join(currentDir, 'dist'); 
+const staticPath =path.join(process.cwd(), 'dist');
 
 // 3. (Optional, but clean) If the files are not found, try using path.join(process.cwd(), 'dist')
 
