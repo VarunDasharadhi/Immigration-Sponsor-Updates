@@ -1,38 +1,35 @@
 // server.js
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// 1. Get the current file's directory (safer than __dirname for ES modules)
+// --- ABSOLUTE PATH SETUP FOR ES MODULES (CRITICAL) ---
+// This safely derives the absolute directory path of the server.js file.
 const __filename = fileURLToPath(import.meta.url);
-const currentDir = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-// 2. Define the project root (up one level if server.js is in a subdirectory, 
-// but since it's in root, currentDir is the project root in the build context)
-const root = path.resolve(currentDir, '..'); // Let's simplify this:
-
-// *** USE THIS LINE FOR THE STATIC PATH ***
-// This reliably points to the 'dist' folder at the root of the project
-//const staticPath = path.join(currentDir, 'dist'); 
-const staticPath =path.join(process.cwd(), 'dist');
-
-// 3. (Optional, but clean) If the files are not found, try using path.join(process.cwd(), 'dist')
-
-// *** Let's use the simplest, most reliable path structure ***
-const distPath = path.resolve(currentDir, 'dist'); 
+// The 'dist' folder contains the built frontend files.
+// We use path.resolve to create a guaranteed absolute path to the 'dist' directory.
+const distPath = path.resolve(__dirname, 'dist');
+// ----------------------------------------------------
 
 const app = express();
-const PORT = process.env.PORT || 10000; 
+const PORT = process.env.PORT || 10000;
 
-// Serve all static files from the 'dist' directory
-app.use(express.static(distPath)); // <-- Changed variable name to distPath
+// 1. Serve Static Files
+// This middleware makes all files inside the dist folder accessible at the root URL.
+// E.g., dist/assets/main.js -> /assets/main.js
+app.use(express.static(distPath));
 
-// For all other GET requests, serve the index.html file.
+// 2. Client-Side Routing Fallback
+// For all GET requests not matching a static file or an API route, serve index.html.
+// This is essential for React Router (if you are using it).
 app.get('*', (req, res) => {
-  // Ensure we serve index.html from the distPath
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+// 3. Start Server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
