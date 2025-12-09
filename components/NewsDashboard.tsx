@@ -161,7 +161,7 @@ export const NewsDashboard: React.FC = () => {
   }, [newsItems, selectedCategory]);
 
   const officialSources = useMemo(() => {
-     return sources.filter(s => s.web?.uri && isOfficialUrl(s.web.uri));
+      return sources.filter(s => s.web?.uri && isOfficialUrl(s.web.uri));
   }, [sources]);
 
   // REDIRECT BUTTON STRATEGY
@@ -173,8 +173,8 @@ export const NewsDashboard: React.FC = () => {
     // 1. Direct Link from Text
     if (item.sourceUrl && isOfficialUrl(item.sourceUrl) && item.sourceUrl.length > 20) {
         return { 
-            url: item.sourceUrl, 
-            label: "View Official Source"
+          url: item.sourceUrl, 
+          label: "View Official Source"
         };
     }
     
@@ -258,8 +258,8 @@ export const NewsDashboard: React.FC = () => {
     return timelineStr.split(';').map(t => {
         const parts = t.split(':');
         return {
-            date: parts[0]?.trim(),
-            event: parts.slice(1).join(':').trim()
+          date: parts[0]?.trim(),
+          event: parts.slice(1).join(':').trim()
         };
     }).filter(t => t.date && t.event);
   };
@@ -276,13 +276,13 @@ export const NewsDashboard: React.FC = () => {
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-             <button 
-                onClick={loadData} 
-                disabled={loading}
-                className="group flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm disabled:opacity-50"
+            <button 
+              onClick={loadData} 
+              disabled={loading}
+              className="group flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm disabled:opacity-50"
             >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                <span className="font-medium">Refresh Feed</span>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+              <span className="font-medium">Refresh Feed</span>
             </button>
         </div>
       </div>
@@ -314,13 +314,13 @@ export const NewsDashboard: React.FC = () => {
       {loading ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-8 xl:col-span-9 space-y-6">
-                 {[1, 2, 3].map(i => (
+                {[1, 2, 3].map(i => (
                     <div key={i} className="h-72 bg-white rounded-2xl border border-slate-100 p-6 shadow-sm animate-pulse flex flex-col gap-4">
                         <div className="h-6 w-1/3 bg-slate-100 rounded-full"></div>
                         <div className="h-8 w-3/4 bg-slate-100 rounded-lg"></div>
                         <div className="h-20 w-full bg-slate-100 rounded-lg"></div>
                     </div>
-                 ))}
+                ))}
             </div>
             <div className="lg:col-span-4 xl:col-span-3 h-96 bg-slate-200/50 rounded-2xl animate-pulse"></div>
         </div>
@@ -356,15 +356,15 @@ export const NewsDashboard: React.FC = () => {
                             {/* Card Header */}
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                                 <div className="flex items-center gap-3">
-                                     <div className={`p-2 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:shadow-sm transition-all`}>
+                                    <div className={`p-2 rounded-lg bg-slate-50 border border-slate-100 group-hover:bg-white group-hover:shadow-sm transition-all`}>
                                         <CategoryIcon category={item.category} />
-                                     </div>
-                                     <div className="flex flex-col">
+                                    </div>
+                                    <div className="flex flex-col">
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{item.category}</span>
                                         <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
                                             <Clock className="w-3 h-3" /> {item.date}
                                         </span>
-                                     </div>
+                                    </div>
                                 </div>
                                 <div className="group-hover:scale-105 transition-transform">
                                     <StatusBadge status={item.status} />
@@ -591,15 +591,16 @@ export const NewsDashboard: React.FC = () => {
                                         <div className="relative pl-6">
                                             <div className="absolute left-[-4px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-purple-600 bg-purple-600 ring-4 ring-purple-50"></div>
                                             <span className="text-xs font-bold text-purple-600 block mb-0.5">{selectedItem.date}</span>
-                                            <p className="text-sm font-medium text-slate-900 leading-snug">Current Status</p>
+                                            <p className="text-sm font-medium text-slate-700 leading-snug">Initial update received</p>
                                         </div>
                                         <div className="relative pl-6">
-                                            <div className="absolute left-[-4px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-dashed border-slate-300 bg-white"></div>
-                                            <span className="text-xs font-bold text-slate-400 block mb-0.5">Upcoming</span>
+                                            <div className="absolute left-[-4px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-slate-300 bg-white"></div>
+                                            <span className="text-xs font-bold text-slate-400 block mb-0.5">Next Step</span>
                                             <p className="text-sm font-medium text-slate-500 leading-snug">{selectedItem.nextSteps}</p>
                                         </div>
                                     </>
                                 )}
+
                             </div>
                         </div>
                     </div>
