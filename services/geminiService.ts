@@ -3,7 +3,7 @@ import { AIResponse, SponsorCheckResult, SponsorNewsItem } from "../types";
 
 // Initialize the client
 // The API key is injected via process.env.API_KEY
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper for exponential backoff retry
