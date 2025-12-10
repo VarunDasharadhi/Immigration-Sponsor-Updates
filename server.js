@@ -12,7 +12,7 @@ import {
     simplifyLegalText,
     checkSponsorStatus,
     fetchSponsorNews
-} from './services/geminiService.ts'; 
+} from './services/geminiService.js'; 
 
 // --- ABSOLUTE PATH SETUP FOR ES MODULES (CRITICAL) ---
 const __filename = fileURLToPath(import.meta.url);
