@@ -11,10 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sed -i "s/__API_KEY__/${{ secrets.DASHBOARD_API_KEY }}/g" public/script.js
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0461004021 }}
           channelId: live
           projectId: gen-lang-client-0461004021
+        env:
+          # This maps your GitHub Secret to the variable Vite looks for
+          VITE_GEMINI_API_KEY: ${{ secrets.DASHBOARD_API_KEY }}
