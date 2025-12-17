@@ -43,9 +43,11 @@ exports.refreshImmigrationData = async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-3.0-flash", // UPDATED: Latest December 2025 Model
+            model: "gemini-3-flash-preview", // UPDATED: Latest December 2025 Model
             contents: PROMPT,
-            config: { tools: [{ googleSearch: {} }] } // Enables real-time web search
+            config: { tools: [{ googleSearch: {} }],
+            thinkingConfig: { thinkingLevel: "medium" } // New for Gemini 3 } // Enables real-time web search
+            }
         });
 
         let rawData = response.text.trim().replace(/```json/g, '').replace(/```/g, '').trim(); 
