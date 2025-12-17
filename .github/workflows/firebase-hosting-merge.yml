@@ -9,18 +9,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Install and Build (Vite needs the key HERE)
+      # 1. Manually Build with the Secret
       - name: Install and Build
-        run: npm ci && npm run build
+        run: |
+          npm ci
+          npm run build
         env:
           VITE_GEMINI_API_KEY: ${{ secrets.DASHBOARD_API_KEY }}
 
-      # 2. Deploy the "dist" folder
+      # 2. Deploy only the results
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0461004021 }}
           channelId: live
           projectId: gen-lang-client-0461004021
-        env:
-          VITE_GEMINI_API_KEY: ${{ secrets.DASHBOARD_API_KEY }}
+          # ADD THESE TWO LINES TO PREVENT OVERWRITING YOUR BUILD
+          target: live
