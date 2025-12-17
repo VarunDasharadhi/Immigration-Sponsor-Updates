@@ -3,7 +3,7 @@ import { AIResponse, SponsorCheckResult, SponsorNewsItem } from "../types";
 
 // Initialize the client
 // The API key is injected via process.env.API_KEY
-const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper for exponential backoff retry
@@ -33,7 +33,7 @@ async function retry<T>(
  */
 export const fetchLatestUpdates = async (): Promise<AIResponse> => {
   try {
-    const modelId = "gemini-2.5-flash"; 
+    const modelId = "gemini-3-flash-preview"; 
     const prompt = `
       Search for the most recent official changes, House of Commons debates, MP statements, and Home Office announcements regarding UK immigration from the last 30 - 60 days.
       
@@ -46,7 +46,7 @@ export const fetchLatestUpdates = async (): Promise<AIResponse> => {
       Check for: "Skilled Worker Indefinite Leave to Remain (ILR) extension", "5-year route changes", "Settlement updates", "Salary threshold changes".
 
       CRITICAL INSTRUCTION: You must act as a comprehensive data extractor.
-      I need 8-10 distinct updates to populate a dashboard.
+      I need atleast 8-10 distinct updates to populate a dashboard.
       
       DIVERSITY RULE: You MUST try to find at least 1-2 updates for EACH of the following categories:
       1. Work (Skilled worker, salary thresholds, shortage lists, ILR/Settlement)
@@ -85,6 +85,8 @@ export const fetchLatestUpdates = async (): Promise<AIResponse> => {
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
+        // New Gemini 3 feature: helps model reason through legal dates
+        thinkingConfig: { thinkingLevel: "medium" }
       },
     }));
 
@@ -106,7 +108,7 @@ export const fetchLatestUpdates = async (): Promise<AIResponse> => {
  */
 export const fetchPetitions = async (): Promise<AIResponse> => {
   try {
-    const modelId = "gemini-2.5-flash";
+    const modelId = "gemini-3-flash-preview";
     const prompt = `
       Search for currently active and trending UK Parliament petitions (site:petition.parliament.uk) 
       specifically related to immigration, visas, international students, and foreign workers.
@@ -131,6 +133,7 @@ export const fetchPetitions = async (): Promise<AIResponse> => {
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
+        thinkingConfig: { thinkingLevel: "medium" }
       },
     }));
 
@@ -179,7 +182,7 @@ export const simplifyLegalText = async (complexText: string): Promise<string> =>
  */
 export const checkSponsorStatus = async (companyName: string): Promise<SponsorCheckResult> => {
   try {
-    const modelId = "gemini-2.5-flash";
+    const modelId = "gemini-3-flash-preview";
     const prompt = `
       Perform a live Google Search for the "Register of licensed sponsors: workers" and "Register of licensed sponsors: students" on GOV.UK.
       Target company: "${companyName}".
