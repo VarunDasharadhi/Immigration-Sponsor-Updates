@@ -1,9 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { AIResponse, SponsorCheckResult, SponsorNewsItem } from "../types";
 
 // Initialize the client
 // The API key is injected via process.env.API_KEY
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper for exponential backoff retry
@@ -86,7 +86,7 @@ export const fetchLatestUpdates = async (): Promise<AIResponse> => {
       config: {
         tools: [{ googleSearch: {} }],
         // New Gemini 3 feature: helps model reason through legal dates
-        thinkingConfig: { thinkingLevel: "medium" }
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
       },
     }));
 
@@ -133,7 +133,7 @@ export const fetchPetitions = async (): Promise<AIResponse> => {
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
-        thinkingConfig: { thinkingLevel: "medium" }
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
       },
     }));
 
