@@ -416,7 +416,7 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
   try {
     const json = parseJsonFromText(text || '{}');
     const result: SponsorCheckResult = {
-      companyName: stripMarkdown(json.companyName || companyName),
+      companyName: stripMarkdown((!json.companyName || json.companyName.toLowerCase() === 'unknown') ? companyName : json.companyName),
       town: stripMarkdown(json.town || 'Unknown'),
       rating: json.rating || 'Unknown',
       routes: json.routes || [],
