@@ -395,37 +395,55 @@ Text to simplify:
 
 Return only the simplified text, no preamble.`,
 
-  sponsorStatus: (name: string) => `Check if "${name}" holds a UK Sponsor Licence for hiring overseas workers.
+  sponsorHistory: (name: string) => `Search for the UK sponsor licence history of "${name}".
 
-Run ALL of these searches:
-1. "${name}" site:tarve.co.uk  — tarve.co.uk mirrors the official GOV.UK register in searchable form
-2. "${name} UK sponsor licence licensed workers"
-3. "${name} LLP sponsor licence", "${name} Ltd sponsor licence", "${name} plc sponsor licence"  — try legal-entity variants
-4. "${name} sponsor licence revoked suspended" — check for bad news
+Find:
+1. When did "${name}" first appear in the UK Register of Licensed Sponsors? (approximate year is fine)
+2. Any licence suspensions, compliance actions, or Home Office enforcement notices
+3. Any revocations or surrenders with approximate dates and reasons
+4. What industry/sector the company is in
 
-The official GOV.UK register is a downloadable CSV (not directly searchable), so tarve.co.uk and similar third-party mirrors are the most reliable way to confirm status.
-
-STATUS LOGIC — apply in this order:
-1. REVOKED/SUSPENDED: Clear evidence of enforcement action -> "Revoked" or "Suspended"
-2. LICENSED: Found in tarve.co.uk results, a sponsor-register mirror, or the company's own site confirms it -> "Licensed"
-3. Well-known major employer (Big 4 accountancy, NHS trust, university, FTSE 100) with no revocation news -> assume "Licensed", note it's unconfirmed
-4. SURRENDERED: Was listed historically but no longer appears -> "Surrendered"
-5. NOT FOUND: Genuinely no evidence for a small or obscure company -> "Not Found"
-
-Extract: official company name as it appears in the register, town/city, industry, date added, sponsor routes (Skilled Worker / Intra-company Transfer / Temporary Worker / Student).
+Search: "${name} UK sponsor licence history", "${name} site:tarve.co.uk", "${name} sponsor licence revoked suspended"
 
 Return ONLY valid JSON — no markdown, no code fences:
 {
-  "companyName": "Official Name as in Register",
+  "natureOfBusiness": "Industry description or Unknown",
+  "dateGranted": "YYYY or YYYY-MM or Unknown",
+  "history": [
+    {"date": "YYYY-MM", "status": "Granted", "details": "First added to UK sponsor register"},
+    {"date": "YYYY-MM", "status": "Suspended", "details": "Reason if known"},
+    {"date": "YYYY-MM", "status": "Reinstated", "details": "After compliance"},
+    {"date": "YYYY-MM", "status": "Revoked", "details": "Reason if known"}
+  ]
+}
+Only include events with real evidence. Empty history array is fine.`,
+
+  sponsorStatusWithHistory: (name: string) => `"${name}" is NOT in the current UK Register of Licensed Sponsors. Investigate why.
+
+Search:
+1. "${name}" site:tarve.co.uk — check if listed there
+2. "${name} UK sponsor licence revoked" — enforcement action?
+3. "${name} LLP sponsor licence", "${name} Ltd sponsor", "${name} plc sponsor" — different legal entity?
+4. "${name} sponsor licence surrendered expired" — voluntary loss?
+5. "${name} Home Office compliance" — any compliance news?
+
+Determine: Did they previously hold a licence? When granted, when and why lost?
+
+Return ONLY valid JSON — no markdown, no code fences:
+{
+  "companyName": "Official name found, or the searched name if nothing found",
   "town": "Town/City or Unknown",
   "rating": "Grade A or Grade B or Unknown",
-  "routes": ["Skilled Worker"],
-  "status": "Licensed or Not Found or Suspended or Revoked or Expired or Surrendered or Unknown",
-  "natureOfBusiness": "Industry description or Unknown",
-  "dateGranted": "YYYY-MM-DD or Unknown",
-  "sponsorType": "Worker, Temporary Worker, Student, etc.",
-  "notes": "Brief explanation of sources found",
-  "history": [{"date": "YYYY-MM", "status": "Granted/Suspended/Revoked", "details": "Event description"}]
+  "routes": ["route names if known"],
+  "status": "Revoked or Surrendered or Expired or Not Found",
+  "natureOfBusiness": "Industry or Unknown",
+  "dateGranted": "YYYY or YYYY-MM or Unknown",
+  "sponsorType": "Worker/Student/etc or Unknown",
+  "notes": "What was found and from what source",
+  "history": [
+    {"date": "YYYY-MM", "status": "Granted", "details": "When they first got the licence"},
+    {"date": "YYYY-MM", "status": "Revoked", "details": "When and why they lost it"}
+  ]
 }`,
 
   sponsorNews: `Search for "recently added to UK sponsor register" and "UK sponsor license revoked companies" from the last 30-60 days.
@@ -551,30 +569,51 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
 
   if (!getApiKey()) return { ...MOCK.sponsor, companyName, notes: 'Mock data — set OPENROUTER_API_KEY for live results' };
 
-  // 1. Search the authoritative GOV.UK register CSV first
+  // 1. Search the authoritative GOV.UK register CSV for current status
   const reg = searchRegister(companyName);
+
   if (reg) {
+    // Found in register — run AI history lookup in parallel
     const ratingMatch = reg.typeRating.match(/(Grade\s+[AB])/i);
     const rating = ratingMatch ? ratingMatch[1] : 'Unknown';
+
+    let natureOfBusiness = 'Unknown';
+    let dateGranted = 'Unknown';
+    let history: { date: string; status: string; details: string }[] = [];
+
+    try {
+      const { text: histText } = await callOpenRouter(
+        [{ role: 'user', content: PROMPTS.sponsorHistory(reg.name) }],
+        getOnlineModel(),
+        1024
+      );
+      const histJson = parseJsonFromText(histText || '{}');
+      natureOfBusiness = stripMarkdown(histJson.natureOfBusiness || 'Unknown');
+      dateGranted = histJson.dateGranted || 'Unknown';
+      history = Array.isArray(histJson.history) ? histJson.history : [];
+    } catch (err) {
+      console.error('[checkSponsor] History lookup failed:', err);
+    }
+
     const result: SponsorCheckResult = {
       companyName: reg.name,
       town: reg.town || 'Unknown',
       rating,
       routes: reg.route ? [reg.route] : [],
       status: 'Licensed',
-      natureOfBusiness: 'Unknown',
-      dateGranted: 'Unknown',
+      natureOfBusiness,
+      dateGranted,
       sponsorType: reg.typeRating || 'Worker',
       notes: 'Confirmed in the current UK Register of Licensed Sponsors (GOV.UK).',
-      history: [],
+      history,
     };
     cache.set(cacheKey, result);
     return result;
   }
 
-  // 2. Not in current register — use AI to check for historical status, context, and revocation news
+  // 2. Not in current register — use AI to find historical status and what happened
   const { text } = await callOpenRouter(
-    [{ role: 'user', content: PROMPTS.sponsorStatus(companyName) }],
+    [{ role: 'user', content: PROMPTS.sponsorStatusWithHistory(companyName) }],
     getOnlineModel(),
     2048
   );
@@ -590,7 +629,7 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
       dateGranted: json.dateGranted || 'Unknown',
       sponsorType: json.sponsorType || 'Unknown',
       notes: stripMarkdown(json.notes || 'Not found in the current UK sponsor register.'),
-      history: json.history || [],
+      history: Array.isArray(json.history) ? json.history : [],
     };
     cache.set(cacheKey, result);
     return result;
