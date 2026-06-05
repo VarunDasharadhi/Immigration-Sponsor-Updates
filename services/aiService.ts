@@ -93,6 +93,149 @@ function annotationsToSources(annotations: any[]): { web?: { uri?: string; title
     .map(a => ({ web: { uri: a.url_citation.url, title: a.url_citation.title ?? '' } }));
 }
 
+// ─── GOV.UK sponsor register (CSV-based, authoritative) ──────────────────────
+
+interface RegisterEntry {
+  name: string;
+  town: string;
+  typeRating: string;
+  route: string;
+}
+
+const workerRegister: RegisterEntry[] = [];
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let inQuotes = false;
+  let cell = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cell += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      cells.push(cell.replace(/^"|"$/g, '').trim());
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  cells.push(cell.replace(/^"|"$/g, '').trim());
+  return cells;
+}
+
+async function fetchRegisterCsvUrl(): Promise<string | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  try {
+    const resp = await fetch(
+      'https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers',
+      { signal: ctrl.signal, headers: { 'User-Agent': 'Mozilla/5.0 (compatible; UKImmigrationCompass/1.0)' } }
+    );
+    const html = await resp.text();
+    const patterns = [
+      /href="(https:\/\/assets\.publishing\.service\.gov\.uk[^"]+\.csv)"/i,
+      /href="(\/government\/uploads[^"]+\.csv)"/i,
+      /href="([^"]+Tier_2[^"]+\.csv)"/i,
+    ];
+    for (const pat of patterns) {
+      const m = html.match(pat);
+      if (m) return m[1].startsWith('http') ? m[1] : `https://www.gov.uk${m[1]}`;
+    }
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function loadSponsorRegister(): Promise<void> {
+  try {
+    const csvUrl = await fetchRegisterCsvUrl();
+    if (!csvUrl) { console.error('[Register] CSV URL not found on gov.uk'); return; }
+    console.log('[Register] Downloading from', csvUrl);
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60_000);
+    let text: string;
+    try {
+      const resp = await fetch(csvUrl, { signal: ctrl.signal });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      text = await resp.text();
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { console.error('[Register] CSV appears empty'); return; }
+
+    const headers = parseCsvLine(lines[0]).map(h => h.toLowerCase());
+    const nameIdx = headers.findIndex(h => h.includes('organisation') || h === 'name');
+    const townIdx = headers.findIndex(h => h.includes('town') || h.includes('city'));
+    const typeIdx = headers.findIndex(h => h.includes('type') && h.includes('rating'));
+    const routeIdx = headers.findIndex(h => h.includes('route'));
+
+    if (nameIdx === -1) { console.error('[Register] Name column not found. Headers:', headers.join(', ')); return; }
+
+    workerRegister.length = 0;
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCsvLine(lines[i]);
+      const name = row[nameIdx]?.trim();
+      if (!name) continue;
+      workerRegister.push({
+        name,
+        town: townIdx >= 0 ? row[townIdx]?.trim() ?? '' : '',
+        typeRating: typeIdx >= 0 ? row[typeIdx]?.trim() ?? '' : '',
+        route: routeIdx >= 0 ? row[routeIdx]?.trim() ?? '' : '',
+      });
+    }
+    console.log(`[Register] Loaded ${workerRegister.length} licensed sponsors`);
+  } catch (err) {
+    console.error('[Register] Failed to load:', err);
+  }
+}
+
+function stripLegalSuffix(s: string): string {
+  return s
+    .replace(/\b(ltd|limited|llp|plc|inc|corp|group|holdings?|uk|international|services?|solutions?|consulting|consultants?|consultancy)\b/gi, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function searchRegister(name: string): RegisterEntry | null {
+  if (workerRegister.length === 0) return null;
+  const q = name.toLowerCase().trim();
+  const qNorm = stripLegalSuffix(q);
+
+  // 1. Exact match
+  const exact = workerRegister.find(e => e.name.toLowerCase() === q);
+  if (exact) return exact;
+
+  // 2. Normalised exact (ignore Ltd/LLP/plc suffixes)
+  if (qNorm.length > 2) {
+    const norm = workerRegister.find(e => stripLegalSuffix(e.name.toLowerCase()) === qNorm);
+    if (norm) return norm;
+  }
+
+  // 3. Register name starts with query ("Deloitte" → "Deloitte LLP")
+  const sw = workerRegister.find(e => e.name.toLowerCase().startsWith(q + ' ') || e.name.toLowerCase() === q);
+  if (sw) return sw;
+
+  // 4. Query starts with register name ("Deloitte LLP UK" → "Deloitte LLP")
+  const rs = workerRegister.find(e => q.startsWith(e.name.toLowerCase() + ' ') || q === e.name.toLowerCase());
+  if (rs) return rs;
+
+  // 5. All significant words match
+  const words = qNorm.split(/\s+/).filter(w => w.length > 2);
+  if (words.length > 0) {
+    const wm = workerRegister.find(e => {
+      const en = e.name.toLowerCase();
+      return words.every(w => en.includes(w));
+    });
+    if (wm) return wm;
+  }
+
+  return null;
+}
+
 // ─── mock data (fallback when no API key and no disk cache) ──────────────────
 
 const MOCK: {
@@ -408,6 +551,28 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
 
   if (!getApiKey()) return { ...MOCK.sponsor, companyName, notes: 'Mock data — set OPENROUTER_API_KEY for live results' };
 
+  // 1. Search the authoritative GOV.UK register CSV first
+  const reg = searchRegister(companyName);
+  if (reg) {
+    const ratingMatch = reg.typeRating.match(/(Grade\s+[AB])/i);
+    const rating = ratingMatch ? ratingMatch[1] : 'Unknown';
+    const result: SponsorCheckResult = {
+      companyName: reg.name,
+      town: reg.town || 'Unknown',
+      rating,
+      routes: reg.route ? [reg.route] : [],
+      status: 'Licensed',
+      natureOfBusiness: 'Unknown',
+      dateGranted: 'Unknown',
+      sponsorType: reg.typeRating || 'Worker',
+      notes: 'Confirmed in the current UK Register of Licensed Sponsors (GOV.UK).',
+      history: [],
+    };
+    cache.set(cacheKey, result);
+    return result;
+  }
+
+  // 2. Not in current register — use AI to check for historical status, context, and revocation news
   const { text } = await callOpenRouter(
     [{ role: 'user', content: PROMPTS.sponsorStatus(companyName) }],
     getOnlineModel(),
@@ -420,11 +585,11 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
       town: stripMarkdown(json.town || 'Unknown'),
       rating: json.rating || 'Unknown',
       routes: json.routes || [],
-      status: json.status || 'Unknown',
+      status: json.status || 'Not Found',
       natureOfBusiness: stripMarkdown(json.natureOfBusiness || 'Unknown'),
       dateGranted: json.dateGranted || 'Unknown',
-      sponsorType: json.sponsorType || 'Worker',
-      notes: stripMarkdown(json.notes || ''),
+      sponsorType: json.sponsorType || 'Unknown',
+      notes: stripMarkdown(json.notes || 'Not found in the current UK sponsor register.'),
       history: json.history || [],
     };
     cache.set(cacheKey, result);
@@ -435,11 +600,11 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
       town: 'Unknown',
       rating: 'Unknown',
       routes: [],
-      status: 'Unknown',
+      status: 'Not Found',
       natureOfBusiness: 'Unknown',
       dateGranted: 'Unknown',
       sponsorType: 'Unknown',
-      notes: 'Could not parse sponsor status from AI response.',
+      notes: 'Not found in the current UK sponsor register.',
       history: [],
     };
   }
@@ -471,6 +636,9 @@ export function initCache(): void {
     console.log('[Cache] No API key — skipping warm-up; mock data will be used');
     return;
   }
+
+  // Load GOV.UK sponsor register CSV in background (authoritative source for checkSponsor)
+  loadSponsorRegister().catch(err => console.error('[Register] Background load failed:', err));
 
   // Warm up any feeds not yet cached (non-blocking)
   for (const [key, refreshFn] of [
