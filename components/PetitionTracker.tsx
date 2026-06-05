@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { fetchPetitions } from '../services/geminiService';
+import { apiClient } from '../services/apiClient';
 import { AIResponse, PetitionItem } from '../types';
-import { ScrollText, TrendingUp, Users, ArrowUpRight, PenTool, CheckCircle, AlertCircle } from 'lucide-react';
+import { stripMarkdown } from '../utils/text';
+import { ScrollText, TrendingUp, Users, ArrowUpRight, PenTool, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export const PetitionTracker: React.FC = () => {
   const [data, setData] = useState<AIResponse | null>(null);
   const [parsedPetitions, setParsedPetitions] = useState<PetitionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Mock chart data - in a real app this could be dynamic
   const engagementData = [
@@ -23,20 +25,20 @@ export const PetitionTracker: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const result = await fetchPetitions();
+        const result = await apiClient.fetchPetitions() as AIResponse;
         setData(result);
-        
-        // Parse the structured response
+
         const petitions: PetitionItem[] = [];
         const blocks = result.text.split('|PETITION_START|').slice(1);
-        
-        blocks.forEach((block, index) => {
+
+        blocks.forEach((block: string, index: number) => {
           const cleanBlock = block.split('|PETITION_END|')[0];
-          const lines = cleanBlock.split('\n').map(l => l.trim()).filter(Boolean);
+          const lines = cleanBlock.split('\n').map((l: string) => l.trim()).filter(Boolean);
           const item: any = {};
-          
-          lines.forEach(line => {
+
+          lines.forEach((line: string) => {
              const keyMatch = line.match(/^(TITLE|SUMMARY|SIGNATURES|STATUS):\s*(.*)/i);
              if (keyMatch) {
                  item[keyMatch[1].toUpperCase()] = keyMatch[2];
@@ -46,18 +48,20 @@ export const PetitionTracker: React.FC = () => {
           if (item.TITLE) {
               petitions.push({
                   id: `pet-${index}`,
-                  title: item.TITLE,
-                  summary: item.SUMMARY || 'No summary available',
+                  title: stripMarkdown(item.TITLE),
+                  summary: stripMarkdown(item.SUMMARY || 'No summary available'),
                   signatures: item.SIGNATURES || 'Trending',
-                  status: item.STATUS || 'Open'
+                  status: item.STATUS || 'Open',
+                  isActive: true
               });
           }
         });
-        
+
         setParsedPetitions(petitions);
 
       } catch (e) {
         console.error(e);
+        setError('Unable to load petitions right now. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -65,9 +69,10 @@ export const PetitionTracker: React.FC = () => {
     load();
   }, []);
 
-  const getProgressWidth = (signatures: string) => {
-    // Extract number from string like "45,200"
-    const num = parseInt(signatures.replace(/[^0-9]/g, '')) || 0;
+  const getProgressWidth = (signatures: string | number) => {
+    // Extract number from string like "45,200" or use number directly
+    const numStr = typeof signatures === 'number' ? signatures.toString() : signatures;
+    const num = parseInt(numStr.replace(/[^0-9]/g, '')) || 0;
     // Cap at 100k for the bar visual
     const percentage = Math.min((num / 100000) * 100, 100);
     // Ensure at least a little bit shows if < 1%
@@ -112,7 +117,7 @@ export const PetitionTracker: React.FC = () => {
                   itemStyle={{ color: '#1e293b', fontWeight: 600 }}
                 />
                 <Bar dataKey="signatures" radius={[6, 6, 6, 6]} barSize={32}>
-                    {engagementData.map((entry, index) => (
+                    {engagementData.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={index === 5 ? '#4f46e5' : '#e2e8f0'} />
                     ))}
                 </Bar>
@@ -158,6 +163,12 @@ export const PetitionTracker: React.FC = () => {
 
       {/* Structured Petitions List */}
       <div className="space-y-6">
+        {error && (
+          <div className="bg-red-50 border border-red-100 p-4 mb-4 text-red-700 rounded-xl flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
         <div className="flex items-center justify-between mb-4">
              <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -202,7 +213,7 @@ export const PetitionTracker: React.FC = () => {
                                     <span className="text-xs text-slate-400 font-medium uppercase tracking-wide">Signatures</span>
                                     <span className="text-xl font-extrabold text-slate-800">{petition.signatures}</span>
                                 </div>
-                                {petition.signatures.includes(',') && (
+                                {typeof petition.signatures === 'string' && petition.signatures.includes(',') && (
                                      <div className="text-right">
                                         <span className="text-[10px] text-slate-400 block">Goal: 100k</span>
                                      </div>

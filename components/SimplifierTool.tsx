@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { simplifyLegalText } from '../services/geminiService';
+import { apiClient } from '../services/apiClient';
+import { stripMarkdown } from '../utils/text';
 import { BookOpen, ArrowRight, Wand2, Copy, Check, FileText } from 'lucide-react';
 
 export const SimplifierTool: React.FC = () => {
@@ -12,8 +13,8 @@ export const SimplifierTool: React.FC = () => {
     if (!input.trim()) return;
     setLoading(true);
     try {
-      const result = await simplifyLegalText(input);
-      setOutput(result);
+      const result = await apiClient.simplifyText(input);
+      setOutput(stripMarkdown(result?.simplified || "Sorry, something went wrong. Please try again."));
     } catch (e) {
       setOutput("Sorry, something went wrong. Please try again.");
     } finally {

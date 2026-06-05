@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2020",
     "experimentalDecorators": true,
-    "useDefineForClassFields": false,
+    "useDefineForClassFields": true,
     "module": "ESNext",
     "outDir": "./dist",
     "lib": [
-      "ES2022",
+      "ES2020",
       "DOM",
       "DOM.Iterable"
     ],
@@ -19,12 +19,29 @@
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Path mapping */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@components/*": ["components/*"],
+      "@services/*": ["services/*"],
+      "@types/*": ["types.ts"],
+      "@utils/*": ["utils/*"]
+    }
+  },
+  "include": ["*.tsx", "*.ts", "api", "components", "services", "utils"],
+  "exclude": ["node_modules", "dist", "build", "vite.config.ts", "jest.config.js", "server.js"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

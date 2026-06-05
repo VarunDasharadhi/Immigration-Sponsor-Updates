@@ -1,25 +1,22 @@
-name: Deploy to Firebase Hosting on merge
+# CI check on merge to main — build + type-check only.
+# Firebase Hosting deploy removed; app is deployed to Vercel.
+
+name: CI on merge
+
 on:
   push:
     branches:
       - main
+
 jobs:
-  build_and_deploy:
+  build_and_check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # 1. Install and Build (Vite needs the key HERE)
-      - name: Install and Build
-        run: npm ci && npm run build
-        env:
-          VITE_GEMINI_API_KEY: ${{ secrets.DASHBOARD_API_KEY }}
-
-      # 2. Deploy the "dist" folder
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: actions/setup-node@v4
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0461004021 }}
-          channelId: live
-          projectId: gen-lang-client-0461004021
-          target: live
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run build

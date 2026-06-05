@@ -1,5 +1,18 @@
-node_modules/
+# Environment variables
 .env
-.firebase/
-firestore.debug.log
-ui-debug.log
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+dist/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# Server-side feed cache (disk-persisted, not committed)
+.cache/

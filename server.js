@@ -1,112 +1,130 @@
-// server.js (UPDATED TO INCLUDE API PROXY ROUTES)
+// server.js
+// Express server: serves the built SPA and proxies all /api/* calls to the
+// server-side AI service so API keys never reach the browser.
 
-const express = require('express');
-const path = require('path');
-const { fileURLToPath } = require('url')
+// Load env from .env.local then .env (Node 24+ built-in, no dotenv dependency)
+for (const file of ['.env.local', '.env']) {
+  try { process.loadEnvFile(file); } catch { /* file absent — fine */ }
+}
 
-// --- IMPORT SECURE GEMINI FUNCTIONS ---
-// Note: Ensure this path is correct relative to your server.js file.
-import {
-    fetchLatestUpdates,
-    fetchPetitions,
-    simplifyLegalText,
-    checkSponsorStatus,
-    fetchSponsorNews
-} from './services/geminiService.ts'; 
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import compression from 'compression';
+import * as aiService from './services/aiService.js';
 
-// --- ABSOLUTE PATH SETUP FOR ES MODULES (CRITICAL) ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, 'dist');
 
-const app = express();
 const PORT = process.env.PORT || 10000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Middleware for parsing request bodies (needed for POST requests like simplify)
+const app = express();
+
+// ─── middleware ──────────────────────────────────────────────────────────────
+
+app.use(compression());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// ===================================================
-// 1. API ROUTES (Must come BEFORE static file serving)
-// ===================================================
-
-// Route 1: Fetch Latest Updates
-app.get('/api/updates', async (req, res) => {
-    try {
-        const updates = await fetchLatestUpdates();
-        res.json(updates);
-    } catch (error) {
-        console.error("API Error - /api/updates:", error);
-        res.status(500).send({ message: "Failed to fetch updates from Gemini service." });
-    }
+// Permissive CORS so the Vite dev server (:3000) can call the API server (:10000)
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
 });
 
-// Route 2: Fetch Petitions
-app.get('/api/petitions', async (req, res) => {
-    try {
-        const petitions = await fetchPetitions();
-        res.json(petitions);
-    } catch (error) {
-        console.error("API Error - /api/petitions:", error);
-        res.status(500).send({ message: "Failed to fetch petitions from Gemini service." });
-    }
+// ─── API routes ───────────────────────────────────────────────────────────────
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
+    hasApiKey: Boolean(process.env.OPENROUTER_API_KEY),
+    env: NODE_ENV,
+    ts: new Date().toISOString(),
+  });
 });
 
-// Route 3: Simplify Legal Text
+app.get('/api/updates', async (_req, res) => {
+  try {
+    const data = await aiService.getUpdates();
+    res.json(data);
+  } catch (err) {
+    console.error('[/api/updates]', err);
+    res.status(500).json({ error: 'Something went wrong fetching updates.' });
+  }
+});
+
+app.get('/api/petitions', async (_req, res) => {
+  try {
+    const data = await aiService.getPetitions();
+    res.json(data);
+  } catch (err) {
+    console.error('[/api/petitions]', err);
+    res.status(500).json({ error: 'Something went wrong fetching petitions.' });
+  }
+});
+
 app.post('/api/simplify', async (req, res) => {
-    const { complexText } = req.body;
-    if (!complexText) {
-        return res.status(400).send({ message: "Missing complexText in request body." });
-    }
-    try {
-        const simplified = await simplifyLegalText(complexText);
-        res.send(simplified);
-    } catch (error) {
-        console.error("API Error - /api/simplify:", error);
-        res.status(500).send({ message: "Failed to simplify text via Gemini service." });
-    }
+  const { complexText } = req.body || {};
+  if (!complexText?.trim()) {
+    return res.status(400).json({ error: 'complexText is required' });
+  }
+  try {
+    const data = await aiService.simplify(complexText);
+    res.json(data);
+  } catch (err) {
+    console.error('[/api/simplify]', err);
+    res.status(500).json({ error: 'Something went wrong simplifying the text.' });
+  }
 });
 
-// Route 4: Check Sponsor Status (using query parameter)
 app.get('/api/sponsor-status', async (req, res) => {
-    const { companyName } = req.query;
-    if (!companyName) {
-        return res.status(400).send({ message: "Missing companyName query parameter." });
-    }
-    try {
-        const status = await checkSponsorStatus(companyName);
-        res.json(status);
-    } catch (error) {
-        console.error("API Error - /api/sponsor-status:", error);
-        res.status(500).send({ message: "Failed to check sponsor status via Gemini service." });
-    }
+  const companyName = String(req.query.companyName || '').trim();
+  if (!companyName) {
+    return res.status(400).json({ error: 'companyName query param is required' });
+  }
+  try {
+    const data = await aiService.checkSponsor(companyName);
+    res.json(data);
+  } catch (err) {
+    console.error('[/api/sponsor-status]', err);
+    res.status(500).json({ error: 'Something went wrong checking sponsor status.' });
+  }
 });
 
-// Route 5: Fetch Sponsor News
-app.get('/api/sponsor-news', async (req, res) => {
-    try {
-        const news = await fetchSponsorNews();
-        res.json(news);
-    } catch (error) {
-        console.error("API Error - /api/sponsor-news:", error);
-        res.status(500).send({ message: "Failed to fetch sponsor news from Gemini service." });
-    }
+app.get('/api/sponsor-news', async (_req, res) => {
+  try {
+    const data = await aiService.getSponsorNews();
+    res.json(data);
+  } catch (err) {
+    console.error('[/api/sponsor-news]', err);
+    res.status(500).json({ error: 'Something went wrong fetching sponsor news.' });
+  }
 });
 
+// ─── static SPA ──────────────────────────────────────────────────────────────
 
-// ===================================================
-// 2. STATIC FILE SERVING (Must come AFTER API Routes)
-// ===================================================
+app.use(express.static(distPath, {
+  maxAge: NODE_ENV === 'production' ? '1d' : 0,
+  etag: false,
+}));
 
-// Serve Static Files
-app.use(express.static(distPath));
-
-// Client-Side Routing Fallback (Must be the LAST route)
-app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+// SPA fallback for client-side tab navigation
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// 3. Start Server
+// ─── start ────────────────────────────────────────────────────────────────────
+
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`API key configured: ${Boolean(process.env.OPENROUTER_API_KEY)}`);
+  // Load disk cache and kick off background warm-up + daily midnight refresh
+  aiService.initCache();
 });
+
+export default app;

@@ -1,3 +1,9 @@
+export enum Tab {
+  NEWS = 'NEWS',
+  PETITIONS = 'PETITIONS',
+  SIMPLIFIER = 'SIMPLIFIER',
+  SPONSORS = 'SPONSORS',
+}
 
 export interface GroundingChunk {
   web?: {
@@ -14,9 +20,9 @@ export interface AIResponse {
 export interface NewsItem {
   id: string;
   title: string;
-  status: 'Active' | 'Passed' | 'Proposed' | 'Discussion' | 'Unknown';
+  status: string;
   date: string;
-  category: 'Work' | 'Student' | 'Family' | 'Asylum' | 'General';
+  category: string;
   summary: string;
   details: string;
   impact: string;
@@ -24,28 +30,32 @@ export interface NewsItem {
   timeline: string;
   searchKeywords: string;
   sourceUrl: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PetitionItem {
   id: string;
   title: string;
   summary: string;
-  signatures: string;
+  signatures: string | number;
   status: string;
+  url?: string;
+  isActive: boolean;
 }
 
 export interface SponsorHistoryEvent {
   date: string;
-  status: 'Granted' | 'Suspended' | 'Revoked' | 'Reinstated' | 'Expired' | 'Surrendered' | 'Audit' | 'Other';
+  status: string;
   details: string;
 }
 
 export interface SponsorCheckResult {
   companyName: string;
   town: string;
-  rating: string; // e.g., "Grade A"
-  routes: string[]; // e.g., ["Skilled Worker", "Global Business Mobility"]
-  status: 'Licensed' | 'Not Found' | 'Suspended' | 'Revoked' | 'Expired' | 'Surrendered' | 'Unknown';
+  rating: string;
+  routes: string[];
+  status: string;
   natureOfBusiness?: string;
   dateGranted?: string;
   sponsorType?: string;
@@ -57,18 +67,5 @@ export interface SponsorNewsItem {
   title: string;
   date: string;
   summary: string;
-  changeType: 'added' | 'revoked' | 'info';
-  sourceUrl?: string;
-}
-
-export enum Tab {
-  NEWS = 'NEWS',
-  PETITIONS = 'PETITIONS',
-  SIMPLIFIER = 'SIMPLIFIER',
-  SPONSORS = 'SPONSORS'
-}
-
-export interface ChartDataPoint {
-  name: string;
-  value: number;
+  changeType: 'added' | 'revoked' | 'info' | string;
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { fetchLatestUpdates } from '../services/geminiService';
+import { apiClient } from '../services/apiClient';
 import { AIResponse, NewsItem } from '../types';
-import { 
-  RefreshCw, ExternalLink, Filter, 
-  Briefcase, GraduationCap, Heart, Globe, AlertCircle, CheckCircle2, Clock, Megaphone, CalendarDays, Zap, ArrowRight, Activity, X, GitCommitVertical, FileText, Link as LinkIcon
+import { stripMarkdown } from '../utils/text';
+import {
+  ExternalLink, Filter,
+  Briefcase, GraduationCap, Heart, Globe, AlertCircle, CheckCircle2, Clock, Megaphone, CalendarDays, Zap, ArrowRight, Activity, X, GitCommitVertical, Link as LinkIcon
 } from 'lucide-react';
 
 export const NewsDashboard: React.FC = () => {
@@ -83,51 +84,63 @@ export const NewsDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchLatestUpdates();
+      const result = await apiClient.fetchUpdates() as AIResponse;
+      console.log('✅ fetchUpdates result:', result);
       setSources(result.sources || []);
       
       const parsedItems: NewsItem[] = [];
       const blocks = result.text.split('|START|').slice(1);
+      console.log('📊 Parsed blocks:', blocks.length);
       
-      blocks.forEach((block, index) => {
+      blocks.forEach((block: string, index: number) => {
         const cleanBlock = block.split('|END|')[0];
-        const lines = cleanBlock.split('\n').map(l => l.trim()).filter(Boolean);
+        const lines = cleanBlock.split('\n').map((l: string) => l.trim()).filter(Boolean);
+        console.log(`📄 Block ${index}:`, { lineCount: lines.length, lines: lines.slice(0, 5) });
         const item: any = {};
         let currentKey = '';
 
-        lines.forEach(line => {
+        lines.forEach((line: string) => {
             const keyMatch = line.match(/^[\*]*\s*(TITLE|STATUS|DATE|CATEGORY|SUMMARY|DETAILS|TIMELINE|IMPACT|NEXT_STEPS|SEARCH_KEYWORDS|SOURCE_URL)[\*]*\s*:\s*(.*)/i);
             if (keyMatch) {
                 const key = keyMatch[1].toUpperCase();
                 const value = keyMatch[2];
                 item[key] = value;
                 currentKey = key;
+                console.log(`  ✅ Found key: ${key} = ${value.substring(0, 50)}`);
             } else if (currentKey) {
                 item[currentKey] += ' ' + line;
             }
         });
+        
+        console.log(`  📦 Parsed item:`, item);
 
         if (item['TITLE']) {
+          const now = new Date().toISOString();
           parsedItems.push({
             id: `news-${index}`,
-            title: item['TITLE'].replace(/\*\*/g, ''),
+            title: stripMarkdown(item['TITLE']),
             status: item['STATUS'] as any || 'Discussion',
             date: item['DATE'] || 'Recent',
             category: normalizeCategory(item['CATEGORY'] || 'General'),
-            summary: item['SUMMARY'] || 'No details provided.',
-            details: item['DETAILS'] || item['SUMMARY'] || 'No detailed analysis available.',
-            impact: item['IMPACT'] || 'See details.',
-            nextSteps: item['NEXT_STEPS'] || 'Check official sources.',
+            summary: stripMarkdown(item['SUMMARY'] || 'No details provided.'),
+            details: stripMarkdown(item['DETAILS'] || item['SUMMARY'] || 'No detailed analysis available.'),
+            impact: stripMarkdown(item['IMPACT'] || 'See details.'),
+            nextSteps: stripMarkdown(item['NEXT_STEPS'] || 'Check official sources.'),
             timeline: item['TIMELINE'] || '',
             searchKeywords: item['SEARCH_KEYWORDS'] || item['TITLE'],
             sourceUrl: cleanUrl(item['SOURCE_URL']),
+            createdAt: now,
+            updatedAt: now,
           });
         }
       });
       
       setNewsItems(parsedItems);
-
+      
+      console.log('✅ setNewsItems called with:', parsedItems.length, 'items');
+      
       if (parsedItems.length === 0 && result.text.length > 0) {
+        const now = new Date().toISOString();
         setNewsItems([{
             id: 'fallback',
             title: 'General Update Summary',
@@ -140,7 +153,9 @@ export const NewsDashboard: React.FC = () => {
             nextSteps: 'Check official sources for timeline.',
             timeline: 'Today: Update released',
             searchKeywords: 'UK Immigration update',
-            sourceUrl: 'https://www.gov.uk/browse/visas-immigration'
+            sourceUrl: 'https://www.gov.uk/browse/visas-immigration',
+            createdAt: now,
+            updatedAt: now,
         }]);
       }
 
@@ -275,16 +290,6 @@ export const NewsDashboard: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <button 
-              onClick={loadData} 
-              disabled={loading}
-              className="group flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-              <span className="font-medium">Refresh Feed</span>
-            </button>
-        </div>
       </div>
 
       {/* Category Pills */}
