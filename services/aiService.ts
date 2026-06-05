@@ -223,13 +223,18 @@ function searchRegister(name: string): RegisterEntry | null {
   const rs = workerRegister.find(e => q.startsWith(e.name.toLowerCase() + ' ') || q === e.name.toLowerCase());
   if (rs) return rs;
 
-  // 5. All significant words match
-  const words = qNorm.split(/\s+/).filter(w => w.length > 2);
-  if (words.length > 0) {
+  // 5. All significant words match — stricter to avoid false positives
+  const words = [...new Set(qNorm.split(/\s+/).filter(w => w.length > 3))];
+  if (words.length >= 2) {
+    // Multi-word: all distinctive words must be present
     const wm = workerRegister.find(e => {
       const en = e.name.toLowerCase();
       return words.every(w => en.includes(w));
     });
+    if (wm) return wm;
+  } else if (words.length === 1) {
+    // Single distinctive word: it must appear at the START of the entry (anchored)
+    const wm = workerRegister.find(e => e.name.toLowerCase().startsWith(words[0]));
     if (wm) return wm;
   }
 
