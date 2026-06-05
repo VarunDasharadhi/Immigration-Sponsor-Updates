@@ -252,28 +252,36 @@ Text to simplify:
 
 Return only the simplified text, no preamble.`,
 
-  sponsorStatus: (name: string) => `Search the UK "Register of licensed sponsors: workers" and "Register of licensed sponsors: students" on GOV.UK.
-Target company: "${name}".
+  sponsorStatus: (name: string) => `Check if "${name}" holds a UK Sponsor Licence for hiring overseas workers.
 
-STATUS LOGIC (check in order):
-1. REVOKED/SUSPENDED: Search "${name} sponsor license revoked" or "suspended" on official sources. If found -> "Revoked" or "Suspended".
-2. LICENSED: Is the company in the most recent search snippets from the gov.uk register? -> "Licensed".
-3. SURRENDERED: Company in older cached lists but NOT in current register -> "Surrendered" (or "Revoked" if enforcement).
-4. NOT FOUND: No record -> "Not Found".
+Run ALL of these searches:
+1. "${name}" site:tarve.co.uk  — tarve.co.uk mirrors the official GOV.UK register in searchable form
+2. "${name} UK sponsor licence licensed workers"
+3. "${name} LLP sponsor licence", "${name} Ltd sponsor licence", "${name} plc sponsor licence"  — try legal-entity variants
+4. "${name} sponsor licence revoked suspended" — check for bad news
 
-Extract: town/city, industry sector, date first added to register, sponsor type (Worker/Temporary Worker/Student).
+The official GOV.UK register is a downloadable CSV (not directly searchable), so tarve.co.uk and similar third-party mirrors are the most reliable way to confirm status.
 
-Return ONLY valid JSON matching this schema (no markdown, no code blocks):
+STATUS LOGIC — apply in this order:
+1. REVOKED/SUSPENDED: Clear evidence of enforcement action -> "Revoked" or "Suspended"
+2. LICENSED: Found in tarve.co.uk results, a sponsor-register mirror, or the company's own site confirms it -> "Licensed"
+3. Well-known major employer (Big 4 accountancy, NHS trust, university, FTSE 100) with no revocation news -> assume "Licensed", note it's unconfirmed
+4. SURRENDERED: Was listed historically but no longer appears -> "Surrendered"
+5. NOT FOUND: Genuinely no evidence for a small or obscure company -> "Not Found"
+
+Extract: official company name as it appears in the register, town/city, industry, date added, sponsor routes (Skilled Worker / Intra-company Transfer / Temporary Worker / Student).
+
+Return ONLY valid JSON — no markdown, no code fences:
 {
-  "companyName": "Official Name Found",
+  "companyName": "Official Name as in Register",
   "town": "Town/City or Unknown",
   "rating": "Grade A or Grade B or Unknown",
-  "routes": ["Route 1"],
+  "routes": ["Skilled Worker"],
   "status": "Licensed or Not Found or Suspended or Revoked or Expired or Surrendered or Unknown",
   "natureOfBusiness": "Industry description or Unknown",
   "dateGranted": "YYYY-MM-DD or Unknown",
-  "sponsorType": "Worker, Temporary Worker, etc.",
-  "notes": "Brief explanation",
+  "sponsorType": "Worker, Temporary Worker, Student, etc.",
+  "notes": "Brief explanation of sources found",
   "history": [{"date": "YYYY-MM", "status": "Granted/Suspended/Revoked", "details": "Event description"}]
 }`,
 
