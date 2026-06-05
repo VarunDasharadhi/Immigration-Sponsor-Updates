@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../services/apiClient';
 import { SponsorCheckResult, SponsorNewsItem } from '../types';
-import { Search, Building2, AlertTriangle, CheckCircle, XCircle, ShieldAlert, Loader2, ExternalLink, RefreshCcw, AlertCircle } from 'lucide-react';
+import { Search, Building2, AlertTriangle, CheckCircle, XCircle, ShieldAlert, Loader2, ExternalLink, RefreshCcw, AlertCircle, Clock, ChevronRight } from 'lucide-react';
 
 export const SponsorChecker: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,13 +161,69 @@ export const SponsorChecker: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Details row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">Sponsor Type</span>
+                    <span className="font-semibold text-slate-900 text-sm">{result.sponsorType || 'Unknown'}</span>
+                  </div>
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">Date Granted</span>
+                    <span className="font-semibold text-slate-900 text-sm">{result.dateGranted || 'Unknown'}</span>
+                  </div>
+                  <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                    <span className="text-xs text-slate-500 uppercase tracking-wider block mb-1">Routes</span>
+                    <span className="font-semibold text-slate-900 text-sm">{result.routes?.length ? result.routes.join(', ') : 'Unknown'}</span>
+                  </div>
+                </div>
+
                 {/* Nature of Business */}
                 <div className="mb-8">
                   <h4 className="text-sm font-bold text-slate-900 mb-3">Nature of business</h4>
                   <div className="p-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium">
-                    • {result.natureOfBusiness || "Information unavailable"}
+                    {result.natureOfBusiness || 'Information unavailable'}
                   </div>
                 </div>
+
+                {/* Licence History */}
+                {result.history && result.history.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-indigo-500" />
+                      Licence History
+                    </h4>
+                    <div className="relative pl-4 border-l-2 border-slate-200 space-y-4">
+                      {result.history.map((event, i) => {
+                        const isGranted = /granted|licensed|added/i.test(event.status);
+                        const isRevoked = /revoked|suspended|enforcement/i.test(event.status);
+                        const dotColor = isGranted ? 'bg-emerald-500' : isRevoked ? 'bg-red-500' : 'bg-amber-400';
+                        const textColor = isGranted ? 'text-emerald-700' : isRevoked ? 'text-red-600' : 'text-amber-700';
+                        const bgColor = isGranted ? 'bg-emerald-50 border-emerald-100' : isRevoked ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100';
+                        return (
+                          <div key={i} className="relative">
+                            <div className={`absolute -left-[21px] top-3 w-3 h-3 rounded-full border-2 border-white ${dotColor}`} />
+                            <div className={`p-4 rounded-xl border ${bgColor}`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <ChevronRight className={`w-3.5 h-3.5 ${textColor}`} />
+                                <span className={`text-xs font-bold uppercase tracking-wider ${textColor}`}>{event.status}</span>
+                                <span className="text-xs text-slate-400 ml-auto">{event.date}</span>
+                              </div>
+                              <p className="text-sm text-slate-700">{event.details}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes (for non-licensed / revoked companies) */}
+                {result.notes && result.status !== 'Licensed' && (
+                  <div className="mb-8 p-4 rounded-xl border border-amber-100 bg-amber-50 text-sm text-amber-800">
+                    <span className="font-bold block mb-1">Additional information</span>
+                    {result.notes}
+                  </div>
+                )}
 
                 {/* Search Information Links */}
                 <div className="mb-8">
