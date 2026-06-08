@@ -4,9 +4,9 @@
  * Responses are disk-cached and refreshed once per day at local midnight.
  */
 
-import { AIResponse, SponsorCheckResult, SponsorNewsItem } from '../types';
-import * as cache from './cache';
-import { stripMarkdown } from '../utils/text';
+import { AIResponse, SponsorCheckResult, SponsorNewsItem } from '../types.js';
+import * as cache from './cache.js';
+import { stripMarkdown } from '../utils/text.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const CALL_TIMEOUT_MS = 45_000;
