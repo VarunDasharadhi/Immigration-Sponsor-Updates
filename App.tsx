@@ -5,7 +5,7 @@ import {
   BookOpen,
   Menu,
   X,
-  ShieldCheck,
+  Landmark,
   ArrowRight,
   ChevronRight,
   Building2,
@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItemConfig[] = [
   {
     tab: Tab.SPONSORS,
     icon: Building2,
-    label: 'Employers',
+    label: 'Sponsors',
     ariaLabel: 'Check sponsor company status',
   },
   {
@@ -139,13 +139,13 @@ const Header: FC<HeaderProps> = ({
           aria-label="Go to home"
         >
           <div className="w-10 h-10 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/10 group-hover:scale-105 transition-transform duration-300">
-            <ShieldCheck className="text-white w-5 h-5" />
+            <Landmark className="text-white w-5 h-5" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-none">
+          <div className="flex flex-col justify-center">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">
               UK Immigration
             </h1>
-            <span className="text-sm font-medium text-blue-600 tracking-wide">
+            <span className="block text-xs font-semibold text-blue-600 tracking-[0.18em] leading-tight">
               COMPASS
             </span>
           </div>
@@ -311,7 +311,7 @@ const Footer: FC = () => {
         <div className="md:col-span-2 pr-8">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <ShieldCheck className="text-white w-4 h-4" />
+              <Landmark className="text-white w-4 h-4" />
             </div>
             <span className="text-lg font-bold text-slate-900">
               UK Immigration Compass
