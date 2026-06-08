@@ -468,31 +468,31 @@ Return 5-6 items. No intro text.`,
 
 // ─── refresh functions (always fetch live) ───────────────────────────────────
 
-async function refreshUpdates(): Promise<AIResponse> {
+export async function refreshUpdates(): Promise<AIResponse> {
   const { text, annotations } = await callOpenRouter(
     [{ role: 'user', content: PROMPTS.latestUpdates }],
     getOnlineModel(),
     12000
   );
   const result: AIResponse = { text: text || 'No updates found.', sources: annotationsToSources(annotations) };
-  cache.set('updates', result);
+  await cache.set('updates', result);
   console.log('[Cache] Refreshed: updates');
   return result;
 }
 
-async function refreshPetitions(): Promise<AIResponse> {
+export async function refreshPetitions(): Promise<AIResponse> {
   const { text, annotations } = await callOpenRouter(
     [{ role: 'user', content: PROMPTS.petitions }],
     getOnlineModel(),
     4096
   );
   const result: AIResponse = { text: text || 'No petitions found.', sources: annotationsToSources(annotations) };
-  cache.set('petitions', result);
+  await cache.set('petitions', result);
   console.log('[Cache] Refreshed: petitions');
   return result;
 }
 
-async function refreshSponsorNews(): Promise<SponsorNewsItem[]> {
+export async function refreshSponsorNews(): Promise<SponsorNewsItem[]> {
   const { text } = await callOpenRouter(
     [{ role: 'user', content: PROMPTS.sponsorNews }],
     getOnlineModel(),
@@ -514,7 +514,7 @@ async function refreshSponsorNews(): Promise<SponsorNewsItem[]> {
       changeType,
     });
   });
-  cache.set('sponsor-news', items);
+  await cache.set('sponsor-news', items);
   console.log('[Cache] Refreshed: sponsor-news');
   return items;
 }
@@ -522,7 +522,7 @@ async function refreshSponsorNews(): Promise<SponsorNewsItem[]> {
 // ─── public getters (serve from cache; refresh once if cold) ─────────────────
 
 export async function getUpdates(): Promise<AIResponse> {
-  const cached = cache.get('updates');
+  const cached = await cache.get('updates');
   if (cached) return cached;
   if (!getApiKey()) return MOCK.updates;
   try {
@@ -534,7 +534,7 @@ export async function getUpdates(): Promise<AIResponse> {
 }
 
 export async function getPetitions(): Promise<AIResponse> {
-  const cached = cache.get('petitions');
+  const cached = await cache.get('petitions');
   if (cached) return cached;
   if (!getApiKey()) return MOCK.petitions;
   try {
@@ -546,7 +546,7 @@ export async function getPetitions(): Promise<AIResponse> {
 }
 
 export async function getSponsorNews(): Promise<SponsorNewsItem[]> {
-  const cached = cache.get('sponsor-news');
+  const cached = await cache.get('sponsor-news');
   if (cached) return cached;
   if (!getApiKey()) return MOCK.sponsorNews;
   try {
@@ -569,7 +569,7 @@ export async function simplify(complexText: string): Promise<{ simplified: strin
 
 export async function checkSponsor(companyName: string): Promise<SponsorCheckResult> {
   const cacheKey = `sponsor:${companyName.toLowerCase().trim()}`;
-  const cached = cache.get(cacheKey);
+  const cached = await cache.get(cacheKey);
   if (cached) return cached;
 
   if (!getApiKey()) return { ...MOCK.sponsor, companyName, notes: 'Mock data — set OPENROUTER_API_KEY for live results' };
@@ -612,7 +612,7 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
       notes: 'Confirmed in the current UK Register of Licensed Sponsors (GOV.UK).',
       history,
     };
-    cache.set(cacheKey, result);
+    await cache.set(cacheKey, result);
     return result;
   }
 
@@ -636,7 +636,7 @@ export async function checkSponsor(companyName: string): Promise<SponsorCheckRes
       notes: stripMarkdown(json.notes || 'Not found in the current UK sponsor register.'),
       history: Array.isArray(json.history) ? json.history : [],
     };
-    cache.set(cacheKey, result);
+    await cache.set(cacheKey, result);
     return result;
   } catch {
     return {
@@ -684,18 +684,23 @@ export function initCache(): void {
   // Load GOV.UK sponsor register CSV in background (authoritative source for checkSponsor)
   loadSponsorRegister().catch(err => console.error('[Register] Background load failed:', err));
 
-  // Warm up any feeds not yet cached (non-blocking)
-  for (const [key, refreshFn] of [
-    ['updates', refreshUpdates],
-    ['petitions', refreshPetitions],
-    ['sponsor-news', refreshSponsorNews],
-  ] as [string, () => Promise<any>][]) {
-    if (!cache.has(key)) {
-      console.log(`[Cache] Cold start — fetching ${key} in background`);
-      refreshFn().catch(err => console.error(`[Cache] Warm-up failed for ${key}:`, err));
-    } else {
-      console.log(`[Cache] ${key} already cached — serving from disk`);
+  // On Vercel, the midnight cron job + Redis handle cache refresh; skip warm-up to avoid extra API calls.
+  // On local/Render (no KV_REST_API_URL), warm up any feeds not yet in the disk cache.
+  if (!process.env.KV_REST_API_URL) {
+    for (const [key, refreshFn] of [
+      ['updates', refreshUpdates],
+      ['petitions', refreshPetitions],
+      ['sponsor-news', refreshSponsorNews],
+    ] as [string, () => Promise<any>][]) {
+      if (!cache.has(key)) {
+        console.log(`[Cache] Cold start — fetching ${key} in background`);
+        refreshFn().catch(err => console.error(`[Cache] Warm-up failed for ${key}:`, err));
+      } else {
+        console.log(`[Cache] ${key} already cached — serving from disk`);
+      }
     }
+  } else {
+    console.log('[Cache] Vercel + Redis detected — skipping warm-up (cron handles refresh)');
   }
 
   // Schedule first run at local midnight, then every 24h

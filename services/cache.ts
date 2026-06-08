@@ -1,13 +1,14 @@
 /**
  * cache.ts
- * Disk-backed in-memory cache for feed data.
- * Persists to .cache/feeds.json so data survives server restarts.
- * Never expires on its own — callers decide when to refresh.
+ * In-memory cache for feed data with two persistence backends:
+ * - Local / Render: disk file at .cache/feeds.json
+ * - Vercel: Upstash Redis via @vercel/kv (shared across all function instances)
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { kv } from '@vercel/kv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Vercel's filesystem is read-only except /tmp; use that in serverless environments
@@ -15,6 +16,9 @@ const CACHE_DIR = process.env.VERCEL
   ? '/tmp/.cache'
   : path.resolve(__dirname, '..', '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'feeds.json');
+
+// True when KV_REST_API_URL is set (Vercel KV storage integration)
+const isRedis = Boolean(process.env.KV_REST_API_URL);
 
 interface CacheEntry {
   data: any;
@@ -24,6 +28,7 @@ interface CacheEntry {
 const store = new Map<string, CacheEntry>();
 
 export function load(): void {
+  if (isRedis) return; // Redis handles persistence on Vercel; no disk to read
   try {
     const raw = fs.readFileSync(CACHE_FILE, 'utf8');
     const parsed: Record<string, CacheEntry> = JSON.parse(raw);
@@ -50,17 +55,42 @@ function persist(): void {
   }
 }
 
-export function get(key: string): any | undefined {
-  return store.get(key)?.data;
+export async function get(key: string): Promise<any | undefined> {
+  const entry = store.get(key);
+  if (entry) return entry.data;
+
+  if (isRedis) {
+    try {
+      const raw = await kv.get<string>(key);
+      if (raw) {
+        const parsed: CacheEntry = JSON.parse(raw);
+        store.set(key, parsed);
+        console.log(`[Cache] Redis hit: ${key}`);
+        return parsed.data;
+      }
+    } catch (err) {
+      console.error('[Cache] Redis get failed:', err);
+    }
+  }
+  return undefined;
 }
 
 export function has(key: string): boolean {
   return store.has(key);
 }
 
-export function set(key: string, data: any): void {
-  store.set(key, { data, savedAt: Date.now() });
-  persist();
+export async function set(key: string, data: any): Promise<void> {
+  const entry: CacheEntry = { data, savedAt: Date.now() };
+  store.set(key, entry);
+  if (isRedis) {
+    try {
+      await kv.set(key, JSON.stringify(entry));
+    } catch (err) {
+      console.error('[Cache] Redis set failed:', err);
+    }
+  } else {
+    persist();
+  }
 }
 
 export function ageMs(key: string): number {
