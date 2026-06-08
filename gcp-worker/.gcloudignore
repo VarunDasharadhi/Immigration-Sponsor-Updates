@@ -6,11 +6,112 @@
 # For more information, run:
 #   $ gcloud topic gcloudignore
 #
-.gcloudignore
-# If you would like to upload your .git directory, .gitignore file or files
-# from your .gitignore file, remove the corresponding line
-# below:
+
+# ===================================================
+# VCS & GIT
+# ===================================================
 .git
 .gitignore
+.gcloudignore
 
-node_modules
+# ===================================================
+# DEPENDENCIES & PACKAGE MANAGERS
+# ===================================================
+node_modules/
+npm-debug.log
+npm-error.log
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+.pnpm-store/
+.npm/
+
+# ===================================================
+# BUILD & DISTRIBUTION
+# ===================================================
+dist/
+build/
+.tsc/
+*.tsbuildinfo
+out/
+
+# ===================================================
+# ENVIRONMENT & SECRETS
+# ===================================================
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# ===================================================
+# IDE & EDITOR
+# ===================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-settings
+
+# ===================================================
+# LOGS & TEMP FILES
+# ===================================================
+*.log
+logs/
+*.log.*
+.log
+.eslintcache
+.stylelintcache
+
+# ===================================================
+# TEST & COVERAGE
+# ===================================================
+coverage/
+.nyc_output/
+*.lcov
+jest.config.js
+.mocharc.*
+
+# ===================================================
+# CREDENTIALS & SENSITIVE DATA
+# ===================================================
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+service-account.json
+secrets/
+
+# ===================================================
+# OS & SYSTEM FILES
+# ===================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ===================================================
+# TEMPORARY & DEVELOPMENT
+# ===================================================
+.tmp/
+temp/
+*.tmp
+.venv/
+venv/
+.env.example (only if testing locally)
