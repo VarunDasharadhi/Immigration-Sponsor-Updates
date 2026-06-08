@@ -700,7 +700,7 @@ export function initCache(): void {
       }
     }
   } else {
-    console.log('[Cache] Vercel + Redis detected — skipping warm-up (cron handles refresh)');
+    console.log('[Cache] KV_REST_API_URL detected — skipping warm-up (cron handles refresh)');
   }
 
   // Schedule first run at local midnight, then every 24h

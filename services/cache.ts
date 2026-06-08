@@ -2,13 +2,15 @@
  * cache.ts
  * In-memory cache for feed data with two persistence backends:
  * - Local / Render: disk file at .cache/feeds.json
- * - Vercel: Upstash Redis via @vercel/kv (shared across all function instances)
+ * - Vercel: Upstash Redis (shared across all function instances)
+ *   Env vars set automatically by the Vercel Upstash marketplace integration:
+ *   UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
  */
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Vercel's filesystem is read-only except /tmp; use that in serverless environments
@@ -17,8 +19,11 @@ const CACHE_DIR = process.env.VERCEL
   : path.resolve(__dirname, '..', '.cache');
 const CACHE_FILE = path.join(CACHE_DIR, 'feeds.json');
 
-// True when KV_REST_API_URL is set (Vercel KV storage integration)
-const isRedis = Boolean(process.env.KV_REST_API_URL);
+// True when KV env vars are present (set by Vercel Upstash marketplace integration)
+const isRedis = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const redis = isRedis
+  ? new Redis({ url: process.env.KV_REST_API_URL!, token: process.env.KV_REST_API_TOKEN! })
+  : null;
 
 interface CacheEntry {
   data: any;
@@ -59,11 +64,11 @@ export async function get(key: string): Promise<any | undefined> {
   const entry = store.get(key);
   if (entry) return entry.data;
 
-  if (isRedis) {
+  if (redis) {
     try {
-      const raw = await kv.get<string>(key);
+      const raw = await redis.get<string>(key);
       if (raw) {
-        const parsed: CacheEntry = JSON.parse(raw);
+        const parsed: CacheEntry = typeof raw === 'string' ? JSON.parse(raw) : raw as CacheEntry;
         store.set(key, parsed);
         console.log(`[Cache] Redis hit: ${key}`);
         return parsed.data;
@@ -82,9 +87,9 @@ export function has(key: string): boolean {
 export async function set(key: string, data: any): Promise<void> {
   const entry: CacheEntry = { data, savedAt: Date.now() };
   store.set(key, entry);
-  if (isRedis) {
+  if (redis) {
     try {
-      await kv.set(key, JSON.stringify(entry));
+      await redis.set(key, JSON.stringify(entry));
     } catch (err) {
       console.error('[Cache] Redis set failed:', err);
     }
